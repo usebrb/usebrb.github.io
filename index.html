@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>brb: take a break while Claude works</title>
+<meta name="description" content="brb offers you a break while Claude Code works, and calls you back the moment it's done. Free, open source, macOS. One command to install." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://usebrb.github.io/" />
+<meta property="og:title" content="brb: take a break while Claude works" />
+<meta property="og:description" content="Go somewhere on purpose. brb comes and gets you when Claude is done." />
+<meta property="og:image" content="https://usebrb.github.io/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://usebrb.github.io/og.png" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕️</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --violet: #7c4dff;
+    --violet-deep: #5a2ee0;
+    --ink: #0b0b0f;
+    --ink-soft: #2a1f55;
+    --paper: #f5f2ff;
+    --card: #1d1d21;
+    --card-line: #34343a;
+    --muted: #9a9aa2;
+    --blue: #0a84ff;
+    --amber: #ffb547;
+    --green: #30d158;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Inter, -apple-system, system-ui, "Segoe UI", sans-serif;
+    --ui: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--violet); color: var(--ink);
+    font-family: var(--sans); -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  .emoji { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+
+  /* ---------- hero: one screen, one toy, one command ---------- */
+  .hero {
+    position: relative; min-height: 100svh; display: flex; flex-direction: column;
+    isolation: isolate;
+  }
+  .hero::before { /* grain + vignette, like a poster */
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(30, 0, 90, .45) 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: .45; mix-blend-mode: multiply;
+  }
+
+  .menubar {
+    height: 30px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; background: rgba(12, 6, 30, .38); backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px); color: #fff; font: 500 13px/1 var(--ui);
+  }
+  .menubar .brand { font: 800 14px/1 var(--mono); letter-spacing: -.02em; text-decoration: none; }
+  .menubar nav { display: flex; gap: 18px; align-items: center; }
+  .menubar nav a { text-decoration: none; opacity: .85; }
+  .menubar nav a:hover { opacity: 1; }
+  .status { display: inline-flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; min-width: 64px; }
+  .clock { opacity: .85; }
+  @media (max-width: 560px) { .menubar nav .hide-sm { display: none; } }
+
+  .stage {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: clamp(14px, 2.4vh, 26px); padding: clamp(20px, 4vh, 44px) 16px clamp(24px, 4vh, 44px);
+    text-align: center;
+  }
+  .kicker {
+    font: 700 12px/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);
+    margin: 0;
+  }
+  h1 {
+    margin: 0; font: 800 clamp(36px, 5.6vw, 72px)/.98 var(--mono); letter-spacing: -.045em;
+    max-width: 17ch; text-wrap: balance;
+  }
+  .sub { margin: 0; font-size: clamp(16px, 1.6vw, 19px); line-height: 1.45; color: var(--ink-soft); max-width: 40ch; text-wrap: balance; }
+  .sub b { color: var(--ink); }
+
+  /* ---------- the toy: a real-looking brb card ---------- */
+  .toy { position: relative; width: min(360px, 100%); height: 238px; perspective: 900px; }
+  .card {
+    position: absolute; inset: 0; border-radius: 16px; text-align: left;
+    font-family: var(--ui); box-shadow: 0 30px 60px -20px rgba(20, 0, 70, .55), 0 0 0 1px rgba(0,0,0,.06);
+    transition: opacity .35s ease, transform .45s cubic-bezier(.2,.8,.2,1);
+  }
+  .card[hidden] { display: block; opacity: 0; transform: translateY(14px) scale(.97); pointer-events: none; }
+
+  .panel { background: #fbfbfd; color: #1c1c1e; padding: 14px 14px 12px; }
+  .panel header { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .panel header .emoji { font-size: 24px; }
+  .panel h2 { margin: 0; font-size: 14px; font-weight: 700; }
+  .panel header p { margin: 2px 0 0; font-size: 11.5px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+  .panel ul { list-style: none; margin: 0; padding: 0; }
+  .panel li button {
+    width: 100%; display: flex; align-items: center; gap: 10px; border: 0; background: none;
+    padding: 7px 8px; border-radius: 8px; font: 500 13.5px/1 var(--ui); color: inherit; cursor: pointer; text-align: left;
+  }
+  .panel li button:hover, .panel li button:focus-visible { background: #0a84ff; color: #fff; outline: none; }
+  .panel li button::after { content: "›"; margin-left: auto; opacity: .4; font-size: 16px; }
+  .logo {
+    width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center;
+    font: 800 11px/1 var(--sans); color: #fff; flex: none;
+  }
+  .panel footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 9px; border-top: 1px solid #e5e5ea; font-size: 11px; color: #8e8e93; }
+  .pill-btn { border: 0; border-radius: 7px; padding: 6px 12px; font: 600 12.5px/1 var(--ui); cursor: pointer; }
+  .pill-btn.gray { background: #e5e5ea; color: #1c1c1e; }
+  .pill-btn.blue { background: var(--blue); color: #fff; }
+  .card.dark .pill-btn.gray { background: #3a3a3f; color: #fff; }
+
+  .away { background: #fff; color: #1c1c1e; overflow: hidden; padding: 0; }
+  .away .bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #eee; font: 600 12.5px/1 var(--ui); }
+  .away .bar .logo { width: 18px; height: 18px; }
+  .away .bar .tick { margin-left: auto; color: #8e8e93; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .feed { padding: 12px 14px; display: grid; gap: 14px; }
+  .post { display: grid; grid-template-columns: 30px 1fr; gap: 10px; }
+  .post i { width: 30px; height: 30px; border-radius: 50%; background: #e9e9ee; }
+  .post span { display: block; height: 8px; border-radius: 4px; background: #ececf1; margin: 5px 0; }
+  .shimmer span, .shimmer i { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+
+  .done { background: var(--card); color: #fff; padding: 18px 18px 16px; display: flex; flex-direction: column; }
+  .done header { display: flex; gap: 12px; align-items: center; }
+  .done header .emoji { font-size: 30px; }
+  .done h2 { margin: 0; font-size: 16px; font-weight: 700; }
+  .done header p { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); }
+  .done .msg { margin: 14px 0 0; font-size: 13.5px; line-height: 1.45; color: #e5e5ea; flex: 1; }
+  .done .row { display: flex; justify-content: space-between; }
+  .done .pill-btn { padding: 8px 14px; font-size: 13px; }
+
+  .term { background: #121215; color: #e5e5ea; font: 13px/1.6 var(--mono); padding: 0; overflow: hidden; }
+  .term .chrome { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #26262b; align-items: center; }
+  .term .chrome i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+  .term .chrome i:nth-child(2) { background: #febc2e; } .term .chrome i:nth-child(3) { background: #28c840; }
+  .term .chrome span { margin: 0 auto; font: 500 11.5px/1 var(--ui); color: #8e8e93; transform: translateX(-20px); }
+  .term pre { margin: 0; padding: 12px 14px; white-space: pre-wrap; font: inherit; }
+  .g { color: var(--green); } .d { color: #8e8e93; } .caret { display: inline-block; width: 7px; height: 14px; background: #e5e5ea; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .hint { font: 600 12px/1 var(--mono); color: var(--ink-soft); letter-spacing: .04em; min-height: 12px; margin: -6px 0 0; }
+
+  /* ---------- the one command ---------- */
+  .install { width: min(860px, 100%); display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; justify-items: center; }
+  .cmd {
+    width: 100%; display: flex; align-items: center; gap: 10px; background: var(--ink); color: #fff;
+    border-radius: 14px; padding: 8px 8px 8px 18px; box-shadow: 0 18px 40px -18px rgba(10, 0, 40, .7);
+    transition: box-shadow .3s, transform .3s;
+  }
+  .cmd.flash { box-shadow: 0 0 0 4px #fff, 0 18px 40px -18px rgba(10, 0, 40, .7); transform: scale(1.02); }
+  .cmd code { flex: 1; min-width: 0; font: 500 clamp(12.5px, 1.1vw, 15px)/1.45 var(--mono); text-align: left; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+  .cmd code::-webkit-scrollbar { display: none; }
+  @media (max-width: 700px) { .cmd code { white-space: normal; overflow-wrap: anywhere; } }
+  .cmd code .d { color: #8e8e93; }
+  .copy {
+    flex: none; border: 0; border-radius: 9px; background: var(--amber); color: var(--ink);
+    font: 800 13px/1 var(--mono); padding: 12px 16px; cursor: pointer; letter-spacing: .02em;
+  }
+  .copy:hover { filter: brightness(1.05); }
+  .copy.ok { background: var(--green); }
+  .meta { font: 500 13px/1.5 var(--sans); color: var(--ink-soft); margin: 0; }
+  .meta a { font-weight: 600; color: var(--ink); }
+  .mac-only { display: none; font: 600 12.5px/1.4 var(--sans); color: var(--ink); background: rgba(255,255,255,.35); padding: 6px 12px; border-radius: 999px; }
+  @media (max-width: 700px) { .mac-only { display: inline-block; } }
+
+  /* ---------- below the fold ---------- */
+  .sheet { background: var(--paper); border-radius: 28px 28px 0 0; padding: 72px 16px 40px; }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  .sheet h2 { font: 800 clamp(28px, 4vw, 44px)/1.05 var(--mono); letter-spacing: -.04em; margin: 0 0 14px; }
+  .sheet .lede { font-size: 18px; line-height: 1.55; color: #4a4560; margin: 0 0 32px; max-width: 58ch; }
+  section + section { margin-top: 88px; }
+
+  .video { border-radius: 18px; overflow: hidden; background: #000; box-shadow: 0 30px 70px -30px rgba(40, 10, 120, .45); aspect-ratio: 16 / 9; }
+  .video video { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  .steps li { background: #fff; border-radius: 16px; padding: 22px; counter-increment: s; }
+  .steps li::before { content: counter(s); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--violet); color: #fff; font: 800 14px/1 var(--mono); margin-bottom: 14px; }
+  .steps h3 { margin: 0 0 6px; font-size: 17px; }
+  .steps p { margin: 0; color: #5b5670; line-height: 1.5; font-size: 15px; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+
+  .code { background: var(--ink); color: #e5e5ea; border-radius: 14px; padding: 16px 18px; font: 13.5px/1.7 var(--mono); overflow-x: auto; margin: 0; }
+  .code .d { color: #7d7d86; }
+
+  details { background: #fff; border-radius: 14px; padding: 0 20px; }
+  details + details { margin-top: 10px; }
+  summary { cursor: pointer; padding: 18px 0; font-weight: 700; font-size: 16px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font: 700 20px/1 var(--mono); color: var(--violet); }
+  details[open] summary::after { content: "–"; }
+  details > div { padding: 0 0 20px; color: #4a4560; line-height: 1.6; font-size: 15.5px; }
+  details > div p { margin: 0 0 12px; }
+  details code { font: 13.5px var(--mono); background: #f0edf9; padding: 2px 6px; border-radius: 5px; }
+  details .code code { background: none; padding: 0; }
+
+  .cta2 { text-align: center; }
+  .cta2 .install { margin: 22px auto 0; }
+  .cta2 .cmd { background: var(--ink); }
+
+  footer.site { text-align: center; color: #7a7590; font-size: 13.5px; line-height: 1.6; padding: 56px 16px 36px; background: var(--paper); }
+  footer.site a { color: #3a3450; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="menubar" aria-label="Menu bar">
+    <a class="brand" href="#">brb</a>
+    <nav>
+      <a class="hide-sm" href="#demo">Demo</a>
+      <a class="hide-sm" href="#faq">FAQ</a>
+      <a href="https://github.com/usebrb/brb">GitHub</a>
+      <span class="status" id="status" aria-live="polite"><span class="emoji">☕️</span></span>
+      <span class="clock hide-sm" id="clock"></span>
+    </nav>
+  </div>
+
+  <main class="stage">
+    <p class="kicker">For Claude Code · macOS</p>
+    <h1>Take a break while Claude works.</h1>
+    <p class="sub"><b>brb</b> offers somewhere to go when a turn runs long, and calls you back the moment it's done.</p>
+
+    <div class="toy" id="toy">
+      <!-- 1. the break panel -->
+      <div class="card panel" data-step="panel">
+        <header>
+          <span class="emoji">☕️</span>
+          <div><h2>Time for a break?</h2><p>Claude has been working <span data-secs>12s</span> · brb</p></div>
+        </header>
+        <ul>
+          <li><button data-go="X"><span class="logo" style="background:#000">𝕏</span>X</button></li>
+          <li><button data-go="Reddit"><span class="logo" style="background:#ff4500">r/</span>Reddit</button></li>
+          <li><button data-go="Hacker News"><span class="logo" style="background:#ff6600">Y</span>Hacker News</button></li>
+          <li><button data-go="Substack"><span class="logo" style="background:#ff6719">S</span>Substack</button></li>
+        </ul>
+        <footer><span>Your list: <code style="font:11px var(--mono)">brb items</code></span><button class="pill-btn gray" data-stay>Stay here</button></footer>
+      </div>
+
+      <!-- 2. you went somewhere -->
+      <div class="card away" data-step="away" hidden>
+        <div class="bar"><span class="logo" id="awayLogo">𝕏</span><span id="awayName">X</span><span class="tick">Claude: <span data-secs>14s</span> <span class="emoji">⚡️</span></span></div>
+        <div class="feed shimmer">
+          <div class="post"><i></i><div><span style="width:40%"></span><span></span><span style="width:80%"></span></div></div>
+          <div class="post"><i></i><div><span style="width:30%"></span><span style="width:92%"></span><span style="width:60%"></span></div></div>
+          <div class="post"><i></i><div><span style="width:45%"></span><span></span></div></div>
+        </div>
+      </div>
+
+      <!-- 3. the callback -->
+      <div class="card done dark" data-step="done" hidden>
+        <header>
+          <span class="emoji">✅</span>
+          <div><h2>Claude is done</h2><p>worked 1m 27s · brb</p></div>
+        </header>
+        <p class="msg">Wrote 64 test cases for the timer helpers. All green.</p>
+        <div class="row"><button class="pill-btn gray" data-stay>Stay here</button><button class="pill-btn blue" data-back>Back to Terminal</button></div>
+      </div>
+
+      <!-- 4. right where you left off -->
+      <div class="card term" data-step="term" hidden>
+        <div class="chrome"><i></i><i></i><i></i><span>~/project · claude</span></div>
+        <pre><span class="d">&gt;</span> write tests for the timer helpers
+<span class="g">●</span> Wrote 64 test cases. <span class="g">All green.</span>
+<span class="d">✻ Cooked for 1m 27s</span>
+
+<span class="d">&gt;</span> nice. now install brb<span class="caret"></span></pre>
+      </div>
+    </div>
+    <p class="hint" id="hint">↑ go on, pick one</p>
+
+    <div class="install" id="install">
+      <div class="cmd" id="cmd">
+        <code><span class="d">$</span> claude plugin marketplace add usebrb/brb &amp;&amp; claude plugin install brb@brb</code>
+        <button class="copy" data-copy>Copy</button>
+      </div>
+      <p class="meta">Paste it in Terminal, then start a new Claude Code session. Free &amp; open source · <a href="#what">what it does</a> · <a href="https://github.com/usebrb/brb">GitHub</a></p>
+      <span class="mac-only">brb runs on your Mac. Open this page there to install.</span>
+    </div>
+  </main>
+</div>
+
+<div class="sheet">
+  <div class="wrap">
+
+    <section id="demo">
+      <h2>The whole loop, in 16 seconds.</h2>
+      <p class="lede">Claude starts a long turn. The break panel shows up, you go to X, and the "Claude is done" card finds you there. One click and you're back in the terminal.</p>
+      <div class="video">
+        <video src="demo.mp4" poster="demo-poster.jpg" muted loop playsinline controls preload="metadata" id="video"></video>
+      </div>
+    </section>
+
+    <section>
+      <h2>How it works</h2>
+      <p class="lede">brb runs on Claude Code's own lifecycle hooks. No AI, no polling, no terminal scraping.</p>
+      <ol class="steps">
+        <li><h3>You send a big prompt</h3><p>After 10 seconds of Claude working, a small panel offers somewhere to go. X, Reddit, HN, or anything you add.</p></li>
+        <li><h3>You go, on purpose</h3><p>The menu bar counts the turn: <span class="emoji">⚡️</span> while it runs, <span class="emoji">✅</span> when it lands. Blocked on a permission prompt? You get a "Claude needs you" ping.</p></li>
+        <li><h3>It comes and gets you</h3><p>"Claude is done" shows up over whatever you're reading, with a one-line summary. <b>Back to Terminal</b> puts you right where you were.</p></li>
+      </ol>
+    </section>
+
+    <section id="what">
+      <h2>What the command does</h2>
+      <p class="lede">It uses Claude Code's own plugin installer, so nothing runs from this website. The rest happens on your next session.</p>
+      <ol class="steps">
+        <li><h3>Adds the plugin</h3><p>Claude Code installs brb's hooks from <a href="https://github.com/usebrb/brb">github.com/usebrb/brb</a>. Plain bash you can read.</p></li>
+        <li><h3>Fetches the app</h3><p>Your next session downloads the brb menu bar app (about 1&nbsp;MB) from the repo's latest release into Applications, and starts it.</p></li>
+        <li><h3>Keeps them in step</h3><p>Plugin updates arrive through Claude Code, and the app follows to the matching version. Nothing else to maintain.</p></li>
+      </ol>
+      <p class="lede" style="margin:28px 0 0">Prefer slash commands? Inside Claude Code, run <code style="font:15px var(--mono)">/plugin marketplace add usebrb/brb</code>, then <code style="font:15px var(--mono)">/plugin install brb@brb</code>.</p>
+    </section>
+
+    <section id="faq">
+      <h2>Questions</h2>
+      <details>
+        <summary>Does it send my code or prompts anywhere?</summary>
+        <div><p>No. brb reads Claude Code's hook events on your machine and draws two small windows. The only network requests are a one-time fetch of each break site's icon, which you can turn off with <code>touch ~/.claude/brb/no-icons</code>.</p></div>
+      </details>
+      <details>
+        <summary>Where does it work?</summary>
+        <div><p>Anywhere Claude Code runs on a Mac: the CLI in any terminal, the Desktop app, VS Code and JetBrains. <b>Back to Terminal</b> returns you to whichever app owns the session.</p><p>macOS 14 or later. Not on Linux or Windows yet; the hooks just do nothing there.</p></div>
+      </details>
+      <details>
+        <summary>What if I don't take the break?</summary>
+        <div><p>Then brb stays quiet. You only get called back for a turn you walked away from through the panel. Close the panel or hit <b>Stay here</b> and nothing else happens.</p></div>
+      </details>
+      <details>
+        <summary>I build the app myself. Will the plugin overwrite it?</summary>
+        <div><p>Not if you tell it not to: put <code>AUTO_APP=0</code> in <code>~/.claude/brb/config.sh</code>. Then build it from a clone with <code>./brb app install</code>. The app is ad-hoc signed and not notarized; it opens without a warning because the plugin downloads it with curl rather than a browser.</p></div>
+      </details>
+      <details>
+        <summary>How do I uninstall it?</summary>
+        <div><pre class="code"><code>claude plugin uninstall brb@brb
+rm -rf /Applications/brb.app ~/.claude/brb</code></pre></div>
+      </details>
+    </section>
+
+    <section class="cta2">
+      <h2>Go somewhere on purpose.</h2>
+      <div class="install">
+        <div class="cmd">
+          <code><span class="d">$</span> claude plugin marketplace add usebrb/brb &amp;&amp; claude plugin install brb@brb</code>
+          <button class="copy" data-copy>Copy</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<footer class="site">
+  <a href="https://github.com/usebrb/brb">github.com/usebrb/brb</a> · MIT licensed<br />
+  An independent project, not affiliated with or endorsed by Anthropic.
+</footer>
+
+<script>
+(() => {
+  const CMD = "claude plugin marketplace add usebrb/brb && claude plugin install brb@brb";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  // Copy buttons
+  $$("[data-copy]").forEach(btn => btn.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(CMD); }
+    catch {
+      const t = document.createElement("textarea"); t.value = CMD; document.body.append(t);
+      t.select(); document.execCommand("copy"); t.remove();
+    }
+    btn.textContent = "Copied"; btn.classList.add("ok");
+    setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("ok"); }, 1800);
+  }));
+
+  // Menu bar clock
+  const clock = $("#clock");
+  const tickClock = () => clock.textContent = new Date().toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  tickClock(); setInterval(tickClock, 15000);
+
+  // The toy: panel → away → done → terminal
+  const status = $("#status"), hint = $("#hint");
+  const show = step => $$("#toy .card").forEach(c => c.hidden = c.dataset.step !== step);
+  const setStatus = html => status.innerHTML = html;
+  let secs = 12, timer = null, doneTimer = null;
+
+  const count = () => {
+    secs++;
+    $$("[data-secs]").forEach(e => e.textContent = secs + "s");
+    setStatus(`<span class="emoji">⚡️</span>${secs}s`);
+  };
+  const startCounting = () => { clearInterval(timer); timer = setInterval(count, 1000); count(); };
+  const stopCounting = () => clearInterval(timer);
+
+  const reset = () => {
+    clearTimeout(doneTimer); secs = 11; show("panel"); startCounting();
+    hint.textContent = "↑ go on, pick one";
+  };
+
+  $$("[data-go]").forEach(b => b.addEventListener("click", () => {
+    const logo = b.querySelector(".logo");
+    $("#awayName").textContent = b.dataset.go;
+    $("#awayLogo").textContent = logo.textContent;
+    $("#awayLogo").style.background = logo.style.background;
+    show("away"); hint.textContent = "brb is watching Claude for you…";
+    doneTimer = setTimeout(() => {
+      stopCounting(); setStatus(`<span class="emoji">✅</span>done`);
+      show("done"); hint.textContent = "↑ that's the callback";
+    }, 3200);
+  }));
+
+  $$("[data-stay]").forEach(b => b.addEventListener("click", reset));
+
+  $("[data-back]").addEventListener("click", () => {
+    show("term"); setStatus(`<span class="emoji">☕️</span>`);
+    hint.textContent = "right where you left off. your turn ↓";
+    const cmd = $("#cmd");
+    cmd.scrollIntoView({ behavior: "smooth", block: "center" });
+    cmd.classList.add("flash"); setTimeout(() => cmd.classList.remove("flash"), 1400);
+  });
+
+  reset();
+
+  // Play the demo only while it's on screen
+  const video = $("#video");
+  if ("IntersectionObserver" in window && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    new IntersectionObserver(([e]) => { e.isIntersecting ? video.play().catch(() => {}) : video.pause(); }, { threshold: .4 }).observe(video);
+  }
+})();
+</script>
+</body>
+</html>
